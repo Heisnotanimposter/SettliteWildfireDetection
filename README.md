@@ -1,87 +1,130 @@
-# SettliteWildfireDetection
- 2024 AISPARK Mountain fire detection contest
+# Satellite Wildfire Detection & Segmentation Suite
 
-# U-Net for Image Segmentation
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
 
-This repository contains the implementation of a U-Net model for image segmentation, designed to work with satellite imagery. It uses TensorFlow and Keras to train a deep convolutional network to segment images based on training data provided.
+Modular machine learning and computer vision framework for **Satellite Wildfire Detection & Image Segmentation** developed for the 2024 AISPARK Competition.
 
-## Prerequisites
+---
 
-- Python 3.6+
-- TensorFlow 2.x
-- Keras
-- Rasterio (for image handling)
-- NumPy
-- Pandas
-- Joblib
+## 🌟 Key Features
 
-## Installation
+- **Architectures Supported**:
+  - **U-Net**: High-resolution binary semantic segmentation for pinpointing wildfire burned areas.
+  - **Faster R-CNN**: Deep object detection pipeline for wildfire region localized bounding boxes.
+  - **YOLOv9**: Optimized single-stage object detection dataset formatting & training preparation pipeline.
+- **Hardware Acceleration**: Automatic device selection supporting NVIDIA CUDA, Apple Silicon (`mps`), and CPU.
+- **Validation Metrics**: Evaluation suite measuring Intersection over Union (**IoU**), **Dice/F1 Score**, **Precision**, **Recall**, and **Pixel Accuracy**.
+- **Unified CLI**: Standardized scripts for modular training (`train.py`), inference (`predict.py`), and dataset conversion (`yolov9_test1.py`).
 
-1. Clone this repository to your local machine.
-2. Ensure you have all the required libraries:
-    ```bash
-    pip install tensorflow keras rasterio numpy pandas joblib
-    ```
+---
 
-3. Download the dataset:
-    - The dataset is hosted on Google Drive. You will need access to the drive to download it.
-    - Mount your Google Drive in the environment where you're running this notebook:
-        ```python
-        from google.colab import drive
-        drive.mount('/content/drive')
-        ```
-    - Navigate to the shared folder and download the dataset and pre-trained weights.
+## 📁 Repository Directory Structure
 
-## Directory Structure
+```
+SettliteWildfireDetection/
+├── AirportSat/
+│   └── fasterRCNN.py             # Faster R-CNN detection trainer script
+├── Detection/
+│   ├── yolov9_test1.py           # YOLOv9 dataset converter & setup pipeline
+│   └── yolov9_test1.ipynb        # Exploratory notebook
+├── Prediction/
+│   └── baseline/
+│       └── 24AI_SPARK_baseline.ipynb # Contest baseline reference notebook
+├── src/
+│   └── wildfire_detection/
+│       ├── __init__.py
+│       ├── dataset.py            # Dataset loaders, splitters & mask-to-bbox utils
+│       ├── models/
+│       │   ├── __init__.py
+│       │   ├── unet.py           # PyTorch U-Net segmentation network
+│       │   └── faster_rcnn.py    # PyTorch Faster R-CNN detection builder
+│       └── utils/
+│           ├── device.py         # Hardware device auto-selector
+│           └── metrics.py        # IoU, Dice, Precision, Recall metrics
+├── tests/                        # Unit test suite (pytest)
+├── train.py                      # Primary training entrypoint
+├── predict.py                    # Inference & submission generator script
+├── pyproject.toml                # Package configuration
+└── requirements.txt              # Dependency specifications
+```
 
-Ensure your directory is structured as follows:
-/content/drive/MyDrive/twofouraispark/
-│
-├── train_img/ # Training images
-├── train_mask/ # Training masks (if available, otherwise use unsupervised techniques as mentioned)
-├── test_img/ # Test images
-├── train_meta.csv # Metadata for training images
-├── test_meta.csv # Metadata for test images
-└── weights/ # Folder for trained model weights
+---
 
-markdown
-Copy code
+## 🚀 Installation
 
-## Usage
+1. **Clone repository**:
+   ```bash
+   git clone https://github.com/Heisnotanimposter/SettliteWildfireDetection.git
+   cd SettliteWildfireDetection
+   ```
 
-### Training
+2. **Install requirements**:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-1. Open the training script:
-    - Adjust parameters such as `EPOCHS`, `BATCH_SIZE`, and paths to data if necessary.
-    - Configure GPU settings as required by your setup.
+3. **(Optional) Install package in editable mode**:
+   ```bash
+   pip install -e .
+   ```
 
-2. To train the model, run:
-    ```bash
-    python train.py
-    ```
-    This script will train a U-Net model on the specified training data, save checkpoints, and save the final model weights in the `train_output` directory.
+---
 
-### Inference
+## 💡 Usage Guide
 
-1. To perform inference using the trained model, run:
-    ```bash
-    python inference.py
-    ```
-    - This script will load the model from the saved weights and perform segmentation on the test set.
-    - Predictions will be saved as `.pkl` files containing binary masks of the segmented areas.
+### 1. Model Training (`train.py`)
 
-## Model Details
+Train a U-Net model on your dataset:
+```bash
+python train.py --model unet --image-dir data/train_img --mask-dir data/train_mask --epochs 20 --batch-size 8
+```
 
-- **Architecture**: U-Net
-- **Input size**: Configurable, default is 256x256 pixels
-- **Output**: Binary mask of the segmented regions
+Train a Faster R-CNN object detection model:
+```bash
+python train.py --model fasterrcnn --image-dir data/train_img --mask-dir data/train_mask --epochs 10 --batch-size 2
+```
 
-## Contributing
+Perform a synthetic dry-run test without downloading datasets:
+```bash
+python train.py --model unet --dry-run
+python train.py --model fasterrcnn --dry-run
+```
 
-Contributions to this project are welcome. Please fork the repository and submit a pull request.
+---
 
-## License
+### 2. Inference & Submission Generation (`predict.py`)
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+Generate binary mask predictions on test satellite images:
+```bash
+python predict.py --weights weights/best_unet_model.pth --image-dir data/test_img --output-dir predictions
+```
 
+Output includes:
+- Individual prediction PNG mask images (`predictions/pred_*.png`)
+- Serialized pickle file (`predictions/submission_predictions.pkl`) containing binary mask arrays for contest submission.
 
+---
+
+### 3. YOLOv9 Dataset Conversion (`Detection/yolov9_test1.py`)
+
+Convert raw satellite images and binary masks into standard YOLO text annotations and `data.yaml`:
+```bash
+python Detection/yolov9_test1.py --image-dir data/train_img --mask-dir data/train_mask --output-dir data/yolo_dataset
+```
+
+---
+
+## 🧪 Running Unit Tests
+
+Verify dataset loader, metrics calculation, and PyTorch model architectures:
+```bash
+pytest tests/
+```
+
+---
+
+## 📜 License
+
+This project is licensed under the MIT License - see [LICENSE](LICENSE) for details.
