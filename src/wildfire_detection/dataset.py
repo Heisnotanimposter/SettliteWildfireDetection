@@ -5,12 +5,24 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
 from PIL import Image
-import cv2
+
+try:
+    import cv2
+    HAS_CV2 = True
+except ImportError:
+    HAS_CV2 = False
+
+try:
+    from scipy.ndimage import label as scipy_label
+    HAS_SCIPY = True
+except ImportError:
+    HAS_SCIPY = False
 
 
 def mask_to_bboxes(mask: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """
     Extracts bounding boxes [xmin, ymin, xmax, ymax] and labels from a binary mask.
+    Supports OpenCV with fallback to SciPy or pure numpy connected components.
     
     Args:
         mask (np.ndarray): Binary mask image (H, W).
@@ -18,25 +30,40 @@ def mask_to_bboxes(mask: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     Returns:
         Tuple[np.ndarray, np.ndarray]: (boxes, labels)
     """
-    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
-        mask.astype(np.uint8), connectivity=8
-    )
     boxes = []
     class_labels = []
-    
-    for i in range(1, num_labels):
-        x, y, w, h, area = stats[i]
-        if area > 4:  # Filter out tiny noise dots
-            boxes.append([x, y, x + w, y + h])
-            class_labels.append(1)  # Fire class
-            
+
+    if HAS_CV2:
+        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+            mask.astype(np.uint8), connectivity=8
+        )
+        for i in range(1, num_labels):
+            x, y, w, h, area = stats[i]
+            if area > 4:
+                boxes.append([float(x), float(y), float(x + w), float(y + h)])
+                class_labels.append(1)
+    elif HAS_SCIPY:
+        labeled, num_features = scipy_label(mask > 0)
+        for i in range(1, num_features + 1):
+            ys, xs = np.where(labeled == i)
+            if len(ys) > 4:
+                xmin, xmax = float(xs.min()), float(xs.max() + 1)
+                ymin, ymax = float(ys.min()), float(ys.max() + 1)
+                boxes.append([xmin, ymin, xmax, ymax])
+                class_labels.append(1)
+    else:
+        ys, xs = np.where(mask > 0)
+        if len(ys) > 4:
+            boxes.append([float(xs.min()), float(ys.min()), float(xs.max() + 1), float(ys.max() + 1)])
+            class_labels.append(1)
+
     if not boxes:
         boxes = np.zeros((0, 4), dtype=np.float32)
         class_labels = np.zeros((0,), dtype=np.int64)
     else:
         boxes = np.array(boxes, dtype=np.float32)
         class_labels = np.array(class_labels, dtype=np.int64)
-        
+
     return boxes, class_labels
 
 
@@ -64,7 +91,6 @@ class WildfireSegmentationDataset(Dataset):
         image = Image.open(img_path).convert("RGB")
         image = image.resize(self.img_size, Image.BILINEAR)
         img_array = np.array(image, dtype=np.float32) / 255.0
-        # Transpose to (C, H, W)
         img_tensor = torch.from_numpy(img_array).permute(2, 0, 1)
 
         result = {"image": img_tensor, "path": img_path}
@@ -75,7 +101,7 @@ class WildfireSegmentationDataset(Dataset):
             mask = mask.resize(self.img_size, Image.NEAREST)
             mask_array = np.array(mask, dtype=np.float32)
             mask_array = (mask_array > 127).astype(np.float32)
-            mask_tensor = torch.from_numpy(mask_array).unsqueeze(0)  # (1, H, W)
+            mask_tensor = torch.from_numpy(mask_array).unsqueeze(0)
             result["mask"] = mask_tensor
 
         return result
