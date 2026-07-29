@@ -8,29 +8,26 @@ import sys
 import argparse
 import shutil
 import yaml
-import cv2
 import numpy as np
+from PIL import Image
 from sklearn.model_selection import train_test_split
 
-# Ensure src/ is in python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from wildfire_detection.dataset import mask_to_bboxes
 
 
-def convert_mask_to_yolo_labels(mask_path: str, output_txt_path: str, img_shape=(256, 256)):
+def convert_mask_to_yolo_labels(mask_path: str, output_txt_path: str):
     """
     Converts a binary mask image to YOLO object detection text format (class x_center y_center width height).
     """
-    mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
-    if mask is None:
-        return
+    mask_img = Image.open(mask_path).convert("L")
+    mask = np.array(mask_img, dtype=np.uint8)
     h, w = mask.shape
     boxes, labels = mask_to_bboxes(mask)
 
     lines = []
     for box in boxes:
         xmin, ymin, xmax, ymax = box
-        # Normalize coordinates [0, 1]
         x_center = ((xmin + xmax) / 2.0) / w
         y_center = ((ymin + ymax) / 2.0) / h
         box_w = (xmax - xmin) / w
@@ -78,7 +75,6 @@ def prepare_yolo_dataset(image_dir: str, mask_dir: str, output_dir: str, val_siz
                 base_name = os.path.splitext(fname)[0]
                 mask_path = os.path.join(mask_dir, fname)
                 if not os.path.exists(mask_path):
-                    # Try matching png/jpg
                     for ext in [".png", ".jpg", ".tif"]:
                         alt = os.path.join(mask_dir, base_name + ext)
                         if os.path.exists(alt):
