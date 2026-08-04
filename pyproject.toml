@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wildfire_detection"
-version = "0.1.0"
-description = "Satellite Wildfire Detection & Segmentation Suite for AISPARK Contest"
+version = "0.2.0"
+description = "Satellite Wildfire Detection, Segmentation, and Classification Suite"
 readme = "README.md"
 authors = [
     { name = "Satellite Wildfire Detection Team" }
@@ -22,7 +22,8 @@ dependencies = [
     "pyyaml>=5.4.0",
     "joblib>=1.0.0",
     "tqdm>=4.60.0",
-    "matplotlib>=3.4.0"
+    "matplotlib>=3.4.0",
+    "kagglehub>=0.2.0"
 ]
 
 [project.optional-dependencies]
