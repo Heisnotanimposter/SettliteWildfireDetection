@@ -67,6 +67,86 @@ def mask_to_bboxes(mask: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     return boxes, class_labels
 
 
+class WildfireClassificationDataset(Dataset):
+    """
+    PyTorch Dataset for Binary Image Classification (Wildfire vs No Wildfire).
+    Supports directory structure:
+      root_dir/
+        wildfire/
+        nowildfire/
+    or explicit lists of image paths and label integers.
+    """
+    CLASS_MAP = {"nowildfire": 0, "wildfire": 1}
+    INV_CLASS_MAP = {0: "nowildfire", 1: "wildfire"}
+
+    def __init__(
+        self,
+        image_paths: Optional[List[str]] = None,
+        labels: Optional[List[int]] = None,
+        root_dir: Optional[str] = None,
+        img_size: Tuple[int, int] = (256, 256),
+        is_train: bool = True
+    ):
+        self.img_size = img_size
+        self.is_train = is_train
+
+        if root_dir and os.path.exists(root_dir):
+            self.image_paths, self.labels = self._scan_class_directory(root_dir)
+        elif image_paths is not None:
+            self.image_paths = image_paths
+            self.labels = labels if labels is not None else [0] * len(image_paths)
+        else:
+            self.image_paths = []
+            self.labels = []
+
+    def _scan_class_directory(self, root_dir: str) -> Tuple[List[str], List[int]]:
+        valid_exts = {".png", ".jpg", ".jpeg", ".tif", ".tiff"}
+        paths = []
+        lbls = []
+
+        for class_name, label_idx in self.CLASS_MAP.items():
+            class_folder = os.path.join(root_dir, class_name)
+            if not os.path.exists(class_folder):
+                # Try matching case-insensitively or alternative names
+                for name in os.listdir(root_dir):
+                    if name.lower() == class_name.lower():
+                        class_folder = os.path.join(root_dir, name)
+                        break
+
+            if os.path.exists(class_folder):
+                for fname in os.listdir(class_folder):
+                    if os.path.splitext(fname)[1].lower() in valid_exts:
+                        paths.append(os.path.join(class_folder, fname))
+                        lbls.append(label_idx)
+
+        return paths, lbls
+
+    def __len__(self) -> int:
+        return len(self.image_paths)
+
+    def __getitem__(self, idx: int) -> Dict[str, Any]:
+        img_path = self.image_paths[idx]
+        label = self.labels[idx]
+
+        image = Image.open(img_path).convert("RGB")
+        image = image.resize(self.img_size, Image.BILINEAR)
+
+        img_array = np.array(image, dtype=np.float32) / 255.0
+
+        # Simple ImageNet normalization
+        mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+        std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+        img_array = (img_array - mean) / std
+
+        img_tensor = torch.from_numpy(img_array).permute(2, 0, 1)
+
+        return {
+            "image": img_tensor,
+            "label": torch.tensor(label, dtype=torch.long),
+            "path": img_path
+        }
+
+
 class WildfireSegmentationDataset(Dataset):
     """
     PyTorch Dataset for Wildfire Image Segmentation (U-Net style).
